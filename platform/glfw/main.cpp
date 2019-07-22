@@ -125,7 +125,8 @@ int main(int argc, char *argv[]) {
                    .withCenter(mbgl::LatLng {settings.latitude, settings.longitude})
                    .withZoom(settings.zoom)
                    .withBearing(settings.bearing)
-                   .withPitch(settings.pitch));
+                   .withPitch(settings.pitch)
+                   .withPadding(mbgl::EdgeInsets {400, 0, 0, 0}));
     map.setDebug(mbgl::MapDebugOptions(settings.debug));
 
     view->setOnlineStatusCallback([&settings, fileSource]() {

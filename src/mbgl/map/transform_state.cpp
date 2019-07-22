@@ -43,7 +43,7 @@ void TransformState::getProjMatrix(mat4& projMatrix, uint16_t nearZ, bool aligne
     // (the distance between[width/2, height/2] and [width/2 + 1, height/2])
     const double fovAboveCenter = getFieldOfView() * (0.5 + offset.y / size.height);
     const double groundAngle = M_PI / 2.0 + getPitch();
-    const double aboveCenterSurfaceDistance = std::sin(fovAboveCenter) * cameraToCenterDistance / std::sin(M_PI - groundAngle - fovAboveCenter);
+    const double aboveCenterSurfaceDistance = std::sin(fovAboveCenter) * cameraToCenterDistance / std::max(0.001, std::sin(M_PI - groundAngle - fovAboveCenter));
 
 
     // Calculate z distance of the farthest fragment that should be rendered.
@@ -276,6 +276,10 @@ double TransformState::scaleZoom(double s) const {
     return util::log2(s);
 }
 
+ScreenCoordinate TransformState::getCenterOffset() const {
+    return { 0.5 * (edgeInsets.left() - edgeInsets.right()), 0.5 * (edgeInsets.top() - edgeInsets.bottom()) };
+}
+
 ScreenCoordinate TransformState::latLngToScreenCoordinate(const LatLng& latLng) const {
     if (size.isEmpty()) {
         return {};
@@ -310,22 +314,33 @@ LatLng TransformState::screenCoordinateToLatLng(const ScreenCoordinate& point, L
 
     vec4 coord0;
     vec4 coord1;
+    vec4 coord2;
     vec4 point0 = {{ point.x, flippedY, 0, 1 }};
+    vec4 point2 = {{ point.x, flippedY, 0.5, 1 }};
     vec4 point1 = {{ point.x, flippedY, 1, 1 }};
     matrix::transformMat4(coord0, point0, inverted);
     matrix::transformMat4(coord1, point1, inverted);
+    matrix::transformMat4(coord2, point2, inverted);
 
     double w0 = coord0[3];
     double w1 = coord1[3];
 
     Point<double> p0 = Point<double>(coord0[0], coord0[1]) / w0;
     Point<double> p1 = Point<double>(coord1[0], coord1[1]) / w1;
+    double w2 = coord2[3];
+    Point<double> p2 = Point<double>(coord2[0], coord2[1]) / w2;
 
     double z0 = coord0[2] / w0;
     double z1 = coord1[2] / w1;
+    double z2 = coord2[2] / w2;
     double t = z0 == z1 ? 0 : (targetZ - z0) / (z1 - z0);
+    double t2 = z0 == z2 ? 0 : (targetZ - z0) / (z2 - z0);
 
-    return Projection::unproject(util::interpolate(p0, p1, t), scale / util::tileSize, wrapMode);
+    Point<double> pInterpolated = util::interpolate(p0, p1, t);
+    Point<double> pInterpolated2 = util::interpolate(p0, p2, t2);
+    (void)pInterpolated2;
+
+    return Projection::unproject(pInterpolated, scale / util::tileSize, wrapMode);
 }
 
 mat4 TransformState::coordinatePointMatrix() const {
@@ -371,10 +386,6 @@ void TransformState::constrain(double& scale_, double& x_, double& y_) const {
         double max_x = (scale_ * util::tileSize - (rotatedNorth() ? size.height : size.width)) / 2;
         x_ = std::max(-max_x, std::min(x_, max_x));
     }
-}
-
-ScreenCoordinate TransformState::getCenterOffset() const {
-    return { 0.5 * (edgeInsets.left() - edgeInsets.right()), 0.5 * (edgeInsets.top() - edgeInsets.bottom()) };
 }
 
 void TransformState::moveLatLng(const LatLng& latLng, const ScreenCoordinate& anchor) {
