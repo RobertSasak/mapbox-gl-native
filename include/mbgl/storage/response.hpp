@@ -44,7 +44,7 @@ public:
     // Indicates whether we are allowed to use this response according to HTTP caching rules.
     // It may or may not be stale.
     bool isUsable() const {
-        return !mustRevalidate || (expires && *expires > util::now());
+        return true; // !mustRevalidate || (expires && *expires > util::now());
     }
 };
 
